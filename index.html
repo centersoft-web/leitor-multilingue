@@ -1,0 +1,524 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="theme-color" content="#060b1a">
+  <meta name="description" content="Leitor multilíngue com download de áudio em MP3 usando síntese de voz do sistema.">
+  <title>Leitor Multilíngue com Download</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/lamejs/1.2.1/lame.min.js"></script>
+  <style>
+    :root {
+      color-scheme: dark;
+      --bg1: #0f172a;
+      --bg2: #1e1b4b;
+      --card: rgba(255,255,255,.07);
+      --border: rgba(255,255,255,.14);
+      --primary: #6366f1;
+      --primary-hover: #4f46e5;
+      --success: #22c55e;
+      --success-hover: #16a34a;
+      --danger: #ef4444;
+      --danger-hover: #dc2626;
+      --text: #f8fafc;
+      --muted: #a5b4c7;
+      --progress: #facc15;
+      --error: #f87171;
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      min-height: 100vh;
+      margin: 0;
+      padding: 24px;
+      display: grid;
+      place-items: center;
+      font-family: Inter, system-ui, -apple-system, "Segoe UI", sans-serif;
+      color: var(--text);
+      background: linear-gradient(135deg, var(--bg1), var(--bg2));
+    }
+
+    .card {
+      width: min(100%, 640px);
+      padding: clamp(24px, 5vw, 42px);
+      border: 1px solid var(--border);
+      border-radius: 24px;
+      background: var(--card);
+      box-shadow: 0 25px 70px rgba(0,0,0,.38);
+      backdrop-filter: blur(14px);
+    }
+
+    h1 { margin: 0 0 8px; font-size: clamp(24px, 5vw, 32px); }
+    .subtitle { margin: 0 0 26px; color: var(--muted); line-height: 1.55; }
+
+    .field { margin-bottom: 18px; }
+
+    label {
+      display: block;
+      margin-bottom: 8px;
+      font-weight: 700;
+      color: var(--text);
+      font-size: 14px;
+    }
+
+    .field-head {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 8px;
+      gap: 12px;
+    }
+    .field-head label { margin-bottom: 0; }
+
+    select, textarea {
+      width: 100%;
+      padding: 12px 14px;
+      font: inherit;
+      font-size: 15px;
+      color: var(--text);
+      background: rgba(255,255,255,.08);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      outline: none;
+      transition: .2s ease;
+    }
+
+    select:focus, textarea:focus {
+      border-color: var(--primary);
+      background: rgba(99,102,241,.09);
+    }
+
+    textarea {
+      min-height: 140px;
+      resize: vertical;
+      font-family: inherit;
+      line-height: 1.5;
+    }
+
+    select {
+      appearance: none;
+      cursor: pointer;
+      padding-right: 40px;
+      background-image:
+        linear-gradient(45deg, transparent 50%, var(--muted) 50%),
+        linear-gradient(135deg, var(--muted) 50%, transparent 50%);
+      background-position:
+        calc(100% - 20px) calc(50% + 2px),
+        calc(100% - 14px) calc(50% + 2px);
+      background-size: 6px 6px, 6px 6px;
+      background-repeat: no-repeat;
+    }
+
+    select option {
+      background: #1e1b4b;
+      color: var(--text);
+    }
+
+    .buttons {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 12px;
+      margin: 6px 0 18px;
+    }
+
+    button {
+      min-height: 48px;
+      border: 0;
+      border-radius: 12px;
+      padding: 12px 16px;
+      font: inherit;
+      font-weight: 700;
+      cursor: pointer;
+      transition: .2s ease;
+      color: var(--text);
+    }
+
+    button:focus-visible {
+      outline: 3px solid rgba(250,204,21,.55);
+      outline-offset: 2px;
+    }
+
+    button:disabled {
+      opacity: .5;
+      cursor: not-allowed;
+    }
+
+    .btn-primary { background: var(--primary); color: #fff; }
+    .btn-primary:hover:not(:disabled) { background: var(--primary-hover); }
+
+    .btn-danger { background: var(--danger); color: #fff; }
+    .btn-danger:hover:not(:disabled) { background: var(--danger-hover); }
+
+    .btn-success { background: var(--success); color: #052e14; }
+    .btn-success:hover:not(:disabled) { background: var(--success-hover); }
+
+    .btn-limpar {
+      min-height: unset;
+      padding: 6px 12px;
+      font-size: 12px;
+      font-weight: 700;
+      border-radius: 8px;
+      background: rgba(255,255,255,.12);
+      color: var(--text);
+      white-space: nowrap;
+    }
+    .btn-limpar:hover:not(:disabled) { background: rgba(255,255,255,.18); }
+
+    .status {
+      margin: 0 0 16px;
+      padding: 14px 16px;
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      background: rgba(255,255,255,.05);
+      color: var(--muted);
+      font-size: 14px;
+      line-height: 1.55;
+      min-height: 20px;
+    }
+
+    .info {
+      margin: 0;
+      padding: 14px 16px;
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      color: var(--muted);
+      font-size: 13px;
+      line-height: 1.6;
+    }
+
+    .info strong { color: var(--text); }
+
+    @media (max-width: 480px) {
+      body { padding: 14px; }
+      .buttons { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+  <main class="card">
+    <h1>🌍 Leitor Multilíngue</h1>
+    <p class="subtitle">Escolha o idioma, digite o texto, ouça a leitura e baixe o áudio em MP3.</p>
+
+    <div class="field">
+      <label for="langSelect">Escolha o idioma:</label>
+      <select id="langSelect">
+        <option value="tr-TR|tr">🇹🇷 Turco</option>
+        <option value="en-US|en">🇺🇸 Inglês (EUA)</option>
+        <option value="en-GB|en">🇬🇧 Inglês (Reino Unido)</option>
+        <option value="es-ES|es">🇪🇸 Espanhol</option>
+        <option value="fr-FR|fr">🇫🇷 Francês</option>
+        <option value="de-DE|de">🇩🇪 Alemão</option>
+        <option value="it-IT|it">🇮🇹 Italiano</option>
+        <option value="pt-BR|pt">🇧🇷 Português (Brasil)</option>
+        <option value="pt-PT|pt">🇵🇹 Português (Portugal)</option>
+        <option value="ru-RU|ru">🇷🇺 Russo</option>
+        <option value="ja-JP|ja">🇯🇵 Japonês</option>
+        <option value="zh-CN|zh-CN">🇨🇳 Chinês (Mandarim)</option>
+        <option value="ko-KR|ko">🇰🇷 Coreano</option>
+        <option value="ar-SA|ar">🇸🇦 Árabe</option>
+        <option value="hi-IN|hi">🇮🇳 Hindi</option>
+        <option value="nl-NL|nl">🇳🇱 Holandês</option>
+        <option value="pl-PL|pl">🇵🇱 Polonês</option>
+        <option value="el-GR|el">🇬🇷 Grego</option>
+        <option value="sv-SE|sv">🇸🇪 Sueco</option>
+      </select>
+    </div>
+
+    <div class="field">
+      <div class="field-head">
+        <label for="textoInput">Digite o texto:</label>
+        <button id="btnLimpar" class="btn-limpar" type="button">🧹 Limpar texto</button>
+      </div>
+      <textarea id="textoInput" placeholder="Digite ou cole seu texto no idioma selecionado..."></textarea>
+    </div>
+
+    <div class="buttons">
+      <button id="btnOuvir" class="btn-primary" type="button">🔊 Ouvir Fonética</button>
+      <button id="btnParar" class="btn-danger" type="button">⏹️ Parar</button>
+      <button id="btnBaixar" class="btn-success" type="button">⬇️ Baixar Áudio (MP3)</button>
+    </div>
+
+    <div id="status" class="status">✅ Pronto.</div>
+
+    <p class="info">
+      💡 A leitura usa as vozes instaladas no seu sistema.<br>
+      💡 O download grava a leitura em tempo real e converte para MP3. Demora o mesmo tempo da leitura.<br>
+      💡 Na janela de compartilhamento, escolha <strong>Tela inteira</strong> e marque <strong>"Compartilhar áudio do sistema"</strong>.<br>
+      💡 Não silencie o computador durante a gravação e feche outros sons (música, vídeos, notificações).
+    </p>
+  </main>
+
+  <script>
+    const langSelect  = document.getElementById('langSelect');
+    const textoInput  = document.getElementById('textoInput');
+    const btnOuvir    = document.getElementById('btnOuvir');
+    const btnParar    = document.getElementById('btnParar');
+    const btnBaixar   = document.getElementById('btnBaixar');
+    const btnLimpar   = document.getElementById('btnLimpar');
+    const statusDiv   = document.getElementById('status');
+
+    let vozesDisponiveis = [];
+    function carregarVozes() {
+      vozesDisponiveis = window.speechSynthesis.getVoices();
+    }
+    carregarVozes();
+    window.speechSynthesis.onvoiceschanged = carregarVozes;
+
+    function getCodigos() {
+      const [bcp47, google] = langSelect.value.split('|');
+      return { bcp47, google };
+    }
+
+    function escolherVoz(bcp47) {
+      const prefixo = bcp47.split('-')[0].toLowerCase();
+      return vozesDisponiveis.find(v => v.lang.toLowerCase() === bcp47.toLowerCase())
+        || vozesDisponiveis.find(v => v.lang.toLowerCase().startsWith(prefixo))
+        || null;
+    }
+
+    // --- Limpar texto ---
+    btnLimpar.addEventListener('click', () => {
+      textoInput.value = '';
+      textoInput.focus();
+      statusDiv.innerText = '🧹 Texto limpo.';
+    });
+
+    // --- Leitura em voz alta ---
+    btnOuvir.addEventListener('click', () => {
+      const texto = textoInput.value.trim();
+      if (!texto) {
+        alert('Por favor, digite algum texto primeiro.');
+        return;
+      }
+
+      window.speechSynthesis.cancel();
+      const { bcp47 } = getCodigos();
+
+      const utterance = new SpeechSynthesisUtterance(texto);
+      utterance.lang = bcp47;
+      utterance.rate = 0.9;
+      utterance.pitch = 1;
+
+      const voz = escolherVoz(bcp47);
+      if (voz) {
+        utterance.voice = voz;
+        statusDiv.innerText = `🔊 Reproduzindo com voz: ${voz.name}...`;
+      } else {
+        statusDiv.innerText = `🔊 Reproduzindo (voz padrão para ${bcp47}). Se a pronúncia estiver errada, instale o pacote de voz do idioma no seu sistema.`;
+      }
+
+      utterance.onend = () => statusDiv.innerText = '✅ Leitura finalizada.';
+      utterance.onerror = (e) => statusDiv.innerText = '❌ Erro na leitura: ' + e.error;
+
+      window.speechSynthesis.speak(utterance);
+    });
+
+    btnParar.addEventListener('click', () => {
+      window.speechSynthesis.cancel();
+      statusDiv.innerText = '⏹️ Reprodução interrompida.';
+    });
+
+    // --- Divisão do texto em partes ---
+    function dividirTexto(texto, maxLen = 180) {
+      const sentencas = texto.match(/[^.!?;\n]+[.!?;\n]*/g) || [texto];
+      const partes = [];
+      let atual = '';
+
+      for (const s of sentencas) {
+        const cand = (atual + ' ' + s).trim();
+        if (cand.length > maxLen && atual) {
+          partes.push(atual.trim());
+          atual = s;
+        } else {
+          atual = cand;
+        }
+        while (atual.length > maxLen) {
+          let corte = atual.lastIndexOf(' ', maxLen);
+          if (corte <= 0) corte = maxLen;
+          partes.push(atual.slice(0, corte).trim());
+          atual = atual.slice(corte).trim();
+        }
+      }
+      if (atual.trim()) partes.push(atual.trim());
+      return partes;
+    }
+
+    function normalizarBuffer(buffer, alvo = 0.95) {
+      let pico = 0;
+      for (let c = 0; c < buffer.numberOfChannels; c++) {
+        const dados = buffer.getChannelData(c);
+        for (let i = 0; i < dados.length; i++) {
+          const v = Math.abs(dados[i]);
+          if (v > pico) pico = v;
+        }
+      }
+      if (pico === 0 || pico >= alvo) return buffer;
+
+      const ganho = alvo / pico;
+      for (let c = 0; c < buffer.numberOfChannels; c++) {
+        const dados = buffer.getChannelData(c);
+        for (let i = 0; i < dados.length; i++) {
+          dados[i] *= ganho;
+        }
+      }
+      return buffer;
+    }
+
+    async function processarVolume(buffer) {
+      const offline = new OfflineAudioContext(
+        buffer.numberOfChannels,
+        buffer.length,
+        buffer.sampleRate
+      );
+
+      const fonte = offline.createBufferSource();
+      fonte.buffer = buffer;
+
+      const compressor = offline.createDynamicsCompressor();
+      compressor.threshold.value = -30;
+      compressor.knee.value = 20;
+      compressor.ratio.value = 12;
+      compressor.attack.value = 0.003;
+      compressor.release.value = 0.25;
+
+      const ganho = offline.createGain();
+      ganho.gain.value = 2.5;
+
+      fonte.connect(compressor).connect(ganho).connect(offline.destination);
+      fonte.start();
+
+      const renderizado = await offline.startRendering();
+      return normalizarBuffer(renderizado, 0.95);
+    }
+
+    // --- Download: grava o áudio do sistema e converte para MP3 ---
+    btnBaixar.addEventListener('click', async () => {
+      const texto = textoInput.value.trim();
+      if (!texto) {
+        alert('Por favor, digite algum texto primeiro.');
+        return;
+      }
+
+      const { bcp47, google } = getCodigos();
+      const partes = dividirTexto(texto);
+      let stream = null;
+      btnBaixar.disabled = true;
+      btnOuvir.disabled = true;
+
+      try {
+        statusDiv.innerText = '🎙️ Escolha "Tela inteira" e marque "Compartilhar áudio do sistema"...';
+
+        const restricoes = {
+          video: { displaySurface: 'monitor' },
+          audio: { suppressLocalAudioPlayback: false },
+          systemAudio: 'include'
+        };
+
+        try {
+          stream = await navigator.mediaDevices.getDisplayMedia(restricoes);
+        } catch (err) {
+          if (err.name === 'TypeError') {
+            stream = await navigator.mediaDevices.getDisplayMedia({ video: true, audio: true });
+          } else {
+            throw err;
+          }
+        }
+
+        stream.getVideoTracks().forEach(t => t.stop());
+
+        if (stream.getAudioTracks().length === 0) {
+          throw new Error('Nenhum áudio foi compartilhado. Na janela, escolha "Tela inteira" e marque "Compartilhar áudio do sistema".');
+        }
+
+        statusDiv.innerText = '🎙️ Gravando... A página pode ficar muda por um instante.';
+
+        const recorder = new MediaRecorder(new MediaStream(stream.getAudioTracks()));
+        const chunks = [];
+        recorder.ondataavailable = e => { if (e.data.size) chunks.push(e.data); };
+        const gravacaoFim = new Promise(r => recorder.onstop = r);
+        recorder.start();
+
+        await new Promise(r => setTimeout(r, 500));
+
+        const voz = escolherVoz(bcp47);
+
+        for (let i = 0; i < partes.length; i++) {
+          statusDiv.innerText = `🔊 Gravando parte ${i + 1} de ${partes.length}...`;
+          await new Promise((resolve, reject) => {
+            const u = new SpeechSynthesisUtterance(partes[i]);
+            u.lang = bcp47;
+            u.rate = 0.9;
+            if (voz) u.voice = voz;
+            u.onend = resolve;
+            u.onerror = e => reject(new Error('leitura: ' + e.error));
+            window.speechSynthesis.speak(u);
+          });
+        }
+
+        await new Promise(r => setTimeout(r, 500));
+
+        recorder.stop();
+        await gravacaoFim;
+
+        statusDiv.innerText = '⚙️ Convertendo para MP3...';
+        const webm = new Blob(chunks, { type: recorder.mimeType });
+        const audioCtx = new AudioContext();
+        const buffer = await processarVolume(await audioCtx.decodeAudioData(await webm.arrayBuffer()));
+        await audioCtx.close();
+
+        const mp3 = encodeMp3(buffer);
+        const nomeArquivo = `audio_${google}_${Date.now()}.mp3`;
+        baixar(mp3, nomeArquivo);
+
+        statusDiv.innerText = `✅ Download concluído! (${partes.length} parte(s) • ${nomeArquivo})`;
+      } catch (erro) {
+        console.error(erro);
+        statusDiv.innerText = `❌ Falha na gravação: ${erro.message}`;
+      } finally {
+        if (stream) stream.getTracks().forEach(t => t.stop());
+        btnBaixar.disabled = false;
+        btnOuvir.disabled = false;
+      }
+    });
+
+    function encodeMp3(buffer) {
+      const canais = Math.min(buffer.numberOfChannels, 2);
+      const enc = new lamejs.Mp3Encoder(canais, buffer.sampleRate, 128);
+      const esquerda = floatParaInt16(buffer.getChannelData(0));
+      const direita = canais > 1 ? floatParaInt16(buffer.getChannelData(1)) : null;
+      const saida = [];
+      const bloco = 1152;
+
+      for (let i = 0; i < esquerda.length; i += bloco) {
+        const out = direita
+          ? enc.encodeBuffer(esquerda.subarray(i, i + bloco), direita.subarray(i, i + bloco))
+          : enc.encodeBuffer(esquerda.subarray(i, i + bloco));
+        if (out.length) saida.push(out);
+      }
+      const fim = enc.flush();
+      if (fim.length) saida.push(fim);
+      return new Blob(saida, { type: 'audio/mpeg' });
+    }
+
+    function floatParaInt16(f) {
+      const out = new Int16Array(f.length);
+      for (let i = 0; i < f.length; i++) {
+        const s = Math.max(-1, Math.min(1, f[i]));
+        out[i] = s < 0 ? s * 0x8000 : s * 0x7FFF;
+      }
+      return out;
+    }
+
+    function baixar(blob, nome) {
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(blob);
+      a.download = nome;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      setTimeout(() => URL.revokeObjectURL(a.href), 30000);
+    }
+  </script>
+</body>
+</html>
